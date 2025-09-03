@@ -177,3 +177,23 @@ AUTH_USER_MODEL = 'authentication.User'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# --- Django REST Framework defaults (minimal, extend as needed) ---
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+# --- CORS settings for local development ---
+# Allow your React dev server to call the API
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+# If you prefer to allow all origins during local dev, uncomment:
+# CORS_ALLOW_ALL_ORIGINS = True
