@@ -37,6 +37,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # Third-party apps
+    'rest_framework',           # Django REST Framework: build APIs
+    'corsheaders',              # Handle Cross-Origin Resource Sharing (CORS)
     # Local apps
     'core',
     'authentication',
@@ -49,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS: must be high in the list
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -86,18 +90,43 @@ import dj_database_url
 
 load_dotenv(os.path.join(BASE_DIR, '..', '.env'))
 
+# Prefer a single DATABASE_URL (easiest to copy/paste),
+# else fall back to individual POSTGRES_* variables.
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
+    # Example: postgresql+psycopg://user:pass@localhost:5432/minimal_erp
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
 else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+    POSTGRES_DB = os.getenv('POSTGRES_DB')
+    if POSTGRES_DB:
+        # Configure Postgres using individual env vars for beginner-friendly setups
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                # Database name (e.g., minimal_erp)
+                'NAME': POSTGRES_DB,
+                # Database user (e.g., postgres)
+                'USER': os.getenv('POSTGRES_USER', ''),
+                # Password for the user (can be empty for peer/local auth)
+                'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
+                # Host of the database server (localhost for local dev)
+                'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+                # Port Postgres is listening on (default 5432)
+                'PORT': os.getenv('POSTGRES_PORT', '5432'),
+                # Keep connections open for reuse (in seconds)
+                'CONN_MAX_AGE': int(os.getenv('PG_CONN_MAX_AGE', '600')),
+            }
         }
-    }
+    else:
+        # Fallback to SQLite for quick starts when no Postgres env vars are set
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 
 
 # Password validation
