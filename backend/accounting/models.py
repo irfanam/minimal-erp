@@ -20,7 +20,7 @@ class ARInvoice(BaseModel):
     customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name="invoices")
     invoice_number = models.CharField(max_length=50, blank=True, help_text="Optional invoice number")
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
-    invoice_date = models.DateField(default=timezone.now)
+    invoice_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField(null=True, blank=True)
     currency_code = models.CharField(max_length=3, default="INR")
     grand_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -92,7 +92,7 @@ class Invoice(BaseModel):
 
     invoice_number = models.CharField(max_length=50, unique=True)
     customer = models.ForeignKey(Customer, on_delete=models.RESTRICT, related_name="invoices_new")
-    invoice_date = models.DateField(default=timezone.now)
+    invoice_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
     gst_type = models.CharField(max_length=12, choices=GSTType.choices, default=GSTType.INTRA)

@@ -18,12 +18,10 @@ from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from django.http import JsonResponse
-from sales.views import CustomerViewSet
 
-# sales and inventory routers are included via app urls
+# sales, inventory, purchases, accounting routers are included via app urls
 
 router = DefaultRouter()
-router.register(r'customers', CustomerViewSet, basename='customer')
 
 
 def health(_request):
@@ -35,6 +33,7 @@ urlpatterns = [
     path('api/sales/', include('sales.urls')),
     path('api/inventory/', include('inventory.urls')),
     path('api/purchases/', include('purchases.urls')),
+    path('api/accounting/', include('accounting.urls')),
     path('api/auth/', include('authentication.urls')),
     path('health/', health),
 ]
