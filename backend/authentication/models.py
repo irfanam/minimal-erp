@@ -66,11 +66,29 @@ class User(AbstractUser):
 
     # ---------- Helper methods for role-based checks ----------
     def is_admin(self) -> bool:
-        """Return True if the user is an Admin (highest role)."""
+        """
+        Check whether this account has the highest coarse-grained role.
+
+        Returns:
+            bool: True if role == ADMIN, otherwise False.
+
+        Beginner tips:
+        - Use this for high-level feature gates (e.g., can manage settings?).
+        - This does NOT replace Django's fine-grained permissions.
+        """
         return self.role == self.Roles.ADMIN
 
     def is_manager(self) -> bool:
-        """Return True if the user is a Manager or higher (Admin)."""
+        """
+        Check whether this account has at least Manager privileges.
+
+        Returns:
+            bool: True if role is MANAGER or ADMIN, otherwise False.
+
+        Beginner tips:
+        - Useful for mid-tier access like approving documents.
+        - Admins also pass this check since they outrank managers.
+        """
         return self.role in {self.Roles.MANAGER, self.Roles.ADMIN}
 
     def is_staff_role(self) -> bool:
@@ -88,6 +106,22 @@ class User(AbstractUser):
         """
         order = {self.Roles.STAFF: 1, self.Roles.MANAGER: 2, self.Roles.ADMIN: 3}
         return order.get(self.role, 0) >= order.get(role, 0)
+
+        def get_permissions(self) -> list[str]:
+                """
+                Return all Django permissions assigned to this user (directly or via groups).
+
+                How it works (beginner):
+                - Django permissions are strings like "app_label.codename" (e.g., "core.add_company").
+                - Users can have permissions assigned directly or through Groups.
+                - This method calls Django's built-in ``get_all_permissions`` and returns a sorted list
+                    to make it easier to display or debug.
+
+                Note:
+                - The ``role`` field is a coarse label used for simple gates. Real, object-level access
+                    decisions should rely on Django perms or custom DRF permissions.
+                """
+                return sorted(self.get_all_permissions())
 
     # Optional: integrate role with Django's permission checks in a coarse way.
     # We do NOT override the core has_perm for fine-grained perms; groups/permissions remain.
