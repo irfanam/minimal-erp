@@ -117,4 +117,57 @@ def calculate_gst(
 __all__ = [
     'GSTBreakup',
     'calculate_gst',
+    'calculate_gst_breakdown',
 ]
+
+
+def calculate_gst_breakdown(
+    taxable_amount: str | float | int | Decimal,
+    gst_rate: str | float | int | Decimal,
+    gst_type: Literal['intra_state', 'inter_state'],
+) -> dict[str, Decimal]:
+    """
+    Compute GST split amounts for a taxable value.
+
+    Args:
+        taxable_amount: Amount before tax.
+        gst_rate: Total GST percent (e.g., 18 for 18%).
+        gst_type: 'intra_state' -> split equally into CGST + SGST,
+                  'inter_state' -> IGST only.
+
+    Returns:
+        dict with keys: cgst, sgst, igst, total_tax (all Decimals rounded to 2 dp).
+
+    Examples:
+        >>> calculate_gst_breakdown(1000, 18, 'intra_state')
+        {'cgst': Decimal('90.00'), 'sgst': Decimal('90.00'), 'igst': Decimal('0.00'), 'total_tax': Decimal('180.00')}
+        >>> calculate_gst_breakdown(1000, 18, 'inter_state')
+        {'cgst': Decimal('0.00'), 'sgst': Decimal('0.00'), 'igst': Decimal('180.00'), 'total_tax': Decimal('180.00')}
+    """
+    amount = _q(taxable_amount)
+    rate = _q(gst_rate)
+    if rate < 0 or rate > 100:
+        raise ValueError("gst_rate must be between 0 and 100")
+
+    total_tax = amount * rate / Decimal('100')
+    if gst_type == 'inter_state':
+        cgst = Decimal('0')
+        sgst = Decimal('0')
+        igst = total_tax
+    elif gst_type == 'intra_state':
+        cgst = total_tax / Decimal('2')
+        sgst = total_tax / Decimal('2')
+        igst = Decimal('0')
+    else:
+        raise ValueError("gst_type must be 'intra_state' or 'inter_state'")
+
+    cgst_r = _round_money(cgst)
+    sgst_r = _round_money(sgst)
+    igst_r = _round_money(igst)
+    total_r = _round_money(cgst_r + sgst_r + igst_r)
+    return {
+        'cgst': cgst_r,
+        'sgst': sgst_r,
+        'igst': igst_r,
+        'total_tax': total_r,
+    }

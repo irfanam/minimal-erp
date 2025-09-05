@@ -116,3 +116,81 @@ __all__ = [
     'UT_CODES',
     'determine_gst_type',
 ]
+
+
+ONES = [
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"
+]
+TENS = [
+    "", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
+]
+
+
+def _two_digit_words(n: int) -> str:
+    if n < 20:
+        return ONES[n]
+    return TENS[n // 10] + (" " + ONES[n % 10] if n % 10 else "")
+
+
+def _three_digit_words(n: int) -> str:
+    # 0..999 -> words
+    hundred = n // 100
+    rest = n % 100
+    parts = []
+    if hundred:
+        parts.append(ONES[hundred] + " Hundred")
+    if rest:
+        parts.append(_two_digit_words(rest))
+    return " ".join(parts) if parts else ONES[0]
+
+
+def convert_amount_to_words(amount) -> str:
+    """
+    Convert a numeric amount to Indian English words using the Indian numbering system.
+
+    Examples:
+        0        -> 'Zero Rupees Only'
+        1        -> 'One Rupees Only'
+        1234.56  -> 'One Thousand Two Hundred Thirty Four Rupees and Fifty Six Paisa Only'
+        100000   -> 'One Lakh Rupees Only'
+        10000000 -> 'One Crore Rupees Only'
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+
+    # Normalize to Decimal and round to 2 decimals
+    amt = Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    rupees = int(amt)
+    paisa = int((amt - rupees) * 100)
+
+    if rupees == 0 and paisa == 0:
+        return "Zero Rupees Only"
+
+    # Indian grouping: Crore (10^7), Lakh (10^5), Thousand (10^3), Hundred, Tens
+    crore = rupees // 10_000_000
+    rupees %= 10_000_000
+    lakh = rupees // 100_000
+    rupees %= 100_000
+    thousand = rupees // 1_000
+    rupees %= 1_000
+    hundred_rest = rupees  # 0..999
+
+    parts = []
+    if crore:
+        parts.append(_two_digit_words(crore) + " Crore")
+    if lakh:
+        parts.append(_two_digit_words(lakh) + " Lakh")
+    if thousand:
+        parts.append(_two_digit_words(thousand) + " Thousand")
+    if hundred_rest:
+        parts.append(_three_digit_words(hundred_rest))
+
+    words = " ".join(parts) if parts else "Zero"
+    result = f"{words} Rupees"
+
+    if paisa:
+        paisa_words = _two_digit_words(paisa)
+        result += f" and {paisa_words} Paisa"
+
+    result += " Only"
+    return result
