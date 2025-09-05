@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',           # Django REST Framework: build APIs
     'corsheaders',              # Handle Cross-Origin Resource Sharing (CORS)
+    'rest_framework_simplejwt.token_blacklist',  # Enable refresh token blacklisting/rotation
     # Local apps
     'core',
     'authentication',
@@ -87,6 +88,7 @@ WSGI_APPLICATION = 'erp_backend.wsgi.application'
 import os
 from dotenv import load_dotenv
 import dj_database_url
+from datetime import timedelta
 
 load_dotenv(os.path.join(BASE_DIR, '..', '.env'))
 
@@ -181,6 +183,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # --- Django REST Framework defaults (minimal, extend as needed) ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        # Use JWT tokens for stateless API auth
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # Optional fallbacks for browsable API or admin usage
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
@@ -197,3 +202,15 @@ CORS_ALLOWED_ORIGINS = [
 ]
 # If you prefer to allow all origins during local dev, uncomment:
 # CORS_ALLOW_ALL_ORIGINS = True
+
+# --- Simple JWT settings ---
+# JWTs are signed tokens that prove identity. Access tokens are short-lived; refresh tokens get new access tokens.
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,       # Issue a new refresh token on refresh
+    'BLACKLIST_AFTER_ROTATION': True,    # Old refresh token becomes invalid when rotated
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,           # Use Django SECRET_KEY (or set a JWT-specific key)
+    'AUTH_HEADER_TYPES': ('Bearer',),    # Clients send: Authorization: Bearer <token>
+}
