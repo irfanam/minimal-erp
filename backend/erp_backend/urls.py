@@ -19,7 +19,10 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from django.http import JsonResponse
 
+from sales.views import CustomerViewSet
+
 router = DefaultRouter()
+router.register(r'sales/customers', CustomerViewSet, basename='customer')
 
 def health(_request):
     return JsonResponse({"status": "ok"})
