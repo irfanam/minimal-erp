@@ -1,2 +1,1 @@
-// UI primitives exports placeholder
-export {}
+export * from './Button'
