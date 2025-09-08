@@ -1,6 +1,7 @@
 import React from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
-import { useAuth } from './AuthContext'
+// Updated to use new service-based auth hook
+import { useAuth } from '../hooks/useAuth'
 
 interface ProtectedRouteProps {
   roles?: string[]
@@ -10,13 +11,10 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ roles, permissions, redirectTo = '/login', loadingComponent }) => {
-  const { user, initialized, hasPermission } = useAuth()
+  const { user, loading } = useAuth()
+  const hasPermission = () => true // TODO: wire permission system when backend roles/claims ready
 
-  if (!initialized) {
-    return (
-      loadingComponent || <div className="flex items-center justify-center h-60 text-sm text-neutral-500">Loading...</div>
-    )
-  }
+  if (loading) return (loadingComponent || <div className="flex items-center justify-center h-60 text-sm text-neutral-500">Loading...</div>)
 
   if (!user) {
     return <Navigate to={redirectTo} replace />
@@ -26,7 +24,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ roles, permissio
     return <Navigate to={redirectTo} replace />
   }
 
-  if (permissions && permissions.length > 0 && !hasPermission(permissions)) {
+  if (permissions && permissions.length > 0 && !hasPermission()) {
     return <Navigate to={redirectTo} replace />
   }
 

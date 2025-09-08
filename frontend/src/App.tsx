@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import React, { Suspense } from 'react'
 import { MainLayout } from './components/layout'
-import { AuthProvider } from './auth/AuthContext'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { queryClient } from './utils/queryClient'
 
 const Dashboard = React.lazy(() => import('./pages/Dashboard'))
 const LoginPage = React.lazy(() => import('./pages/auth/LoginPage'))
@@ -24,7 +25,7 @@ const ReportsHub = React.lazy(() => import('./modules/reports/ReportsHub.tsx'))
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
+      <QueryClientProvider client={queryClient}>
         <ErrorBoundary>
           <Suspense fallback={<div className="p-6 text-xs text-neutral-500">Loading...</div>}>
             <Routes>
@@ -53,7 +54,7 @@ function App() {
             </Routes>
           </Suspense>
         </ErrorBoundary>
-      </AuthProvider>
+      </QueryClientProvider>
     </BrowserRouter>
   )
 }

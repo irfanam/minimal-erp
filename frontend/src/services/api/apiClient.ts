@@ -1,6 +1,8 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios'
 import { queryClient } from '../../utils/queryClient'
 
+const DEV = import.meta.env.DEV
+
 // Basic token storage abstraction (can later be swapped for more secure storage)
 let accessToken: string | null = null
 let refreshToken: string | null = null
@@ -56,7 +58,16 @@ async function refreshAccessToken(): Promise<string | null> {
   }
 }
 
-apiClient.interceptors.response.use(r => r, async (error: AxiosError) => {
+apiClient.interceptors.response.use(r => {
+  if (DEV) {
+    // Lightweight success logging (can be silenced per domain later)
+    console.debug('[API]', r.status, r.config.method?.toUpperCase(), r.config.url)
+  }
+  return r
+}, async (error: AxiosError) => {
+  if (DEV) {
+    console.warn('[API ERROR]', error.response?.status, error.config?.url, error.message)
+  }
   const original = error.config as any
   if (error.response?.status === 401 && !original?._retry) {
     if (isRefreshing) {
@@ -78,8 +89,17 @@ apiClient.interceptors.response.use(r => r, async (error: AxiosError) => {
     original.headers['Authorization'] = `Bearer ${newToken}`
     return apiClient(original)
   }
+  // Non-auth error propagation
   return Promise.reject(error)
 })
+
+// Global development request logger
+if (DEV) {
+  apiClient.interceptors.request.use(cfg => {
+    console.debug('[API REQ]', cfg.method?.toUpperCase(), cfg.url, cfg.params || '', cfg.data || '')
+    return cfg
+  })
+}
 
 // Global error translation helper
 export function extractErrorMessage(err: any): string {

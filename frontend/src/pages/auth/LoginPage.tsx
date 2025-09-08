@@ -1,24 +1,27 @@
 import React, { useState } from 'react'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../hooks/useAuth'
 import { Button } from '../../components/ui/Button'
 import { useNavigate, Navigate } from 'react-router-dom'
 
 const LoginPage: React.FC = () => {
-  const { login, loading, error, user, initialized } = useAuth()
-  const [email, setEmail] = useState('')
+  const { login, loading, error, user } = useAuth()
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
-
-  if (initialized && user) {
-    return <Navigate to="/" replace />
-  }
+  if (user) return <Navigate to="/" replace />
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const ok = await login({ email, password, remember })
-    if (ok) navigate('/')
+    try {
+      await login({ username, password })
+      if (remember) {
+        // Basic persistence of username (token persistence handled inside services if added later)
+        localStorage.setItem('last_username', username)
+      }
+      navigate('/')
+    } catch (_) { /* error surfaced below */ }
   }
 
   return (
@@ -32,8 +35,16 @@ const LoginPage: React.FC = () => {
           </div>
           <form onSubmit={onSubmit} className="space-y-4 bg-white/80 backdrop-blur-sm border border-neutral-200 rounded-lg p-6 shadow-sm">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-neutral-700">Email</label>
-              <input type="email" autoFocus required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" className="h-10 px-3 rounded-md border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40" />
+              <label className="text-xs font-medium text-neutral-700">Username</label>
+              <input
+                type="text"
+                autoFocus
+                required
+                value={username}
+                onChange={e => setUsername(e.target.value.trim())}
+                placeholder="your-username"
+                className="h-10 px-3 rounded-md border border-neutral-300 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-neutral-700">Password</label>
