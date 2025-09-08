@@ -14,6 +14,11 @@ import { ProductList } from './modules/products/ProductList.tsx'
 import { ProductForm } from './modules/products/ProductForm.tsx'
 import { InventoryDashboard } from './modules/products/InventoryDashboard.tsx'
 import { StockEntry } from './modules/products/StockEntry.tsx'
+// Sales module
+import { SalesOrderList } from './modules/sales/SalesOrderList.tsx'
+import { SalesOrderForm } from './modules/sales/SalesOrderForm.tsx'
+import { InvoiceList } from './modules/sales/InvoiceList.tsx'
+import { InvoiceForm } from './modules/sales/InvoiceForm.tsx'
 
 function App() {
   return (
@@ -34,6 +39,10 @@ function App() {
               <Route path="products/new" element={<div className="px-6 py-6"><ProductForm /></div>} />
               <Route path="inventory" element={<div className="px-6 py-6"><InventoryDashboard /></div>} />
               <Route path="stock-entry" element={<div className="px-6 py-6"><StockEntry /></div>} />
+              <Route path="sales-orders" element={<div className="px-6 py-6"><SalesOrderList /></div>} />
+              <Route path="sales-orders/new" element={<div className="px-6 py-6"><SalesOrderForm /></div>} />
+              <Route path="invoices" element={<div className="px-6 py-6"><InvoiceList /></div>} />
+              <Route path="invoices/new" element={<div className="px-6 py-6"><InvoiceForm /></div>} />
             </Route>
           </Route>
           <Route path="*" element={<div className="text-sm text-neutral-500 p-6">Page not found</div>} />
