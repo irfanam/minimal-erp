@@ -1,9 +1,11 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import type { Customer, CustomerAddress, CustomerContact } from './types'
 import { AddressManager } from './components/AddressManager'
 import { ContactManager } from './components/ContactManager'
 import { Button } from '../../components/ui/Button'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useCustomer, useCustomerMutations } from '../../hooks/useCustomers'
+import { useNotifications } from '../../contexts/NotificationContext'
 import { FormSection } from '../../components/forms'
 
 const emptyCustomer: Customer = {
@@ -20,27 +22,58 @@ const emptyCustomer: Customer = {
 const CustomerForm: React.FC = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const editing = id && id !== 'new'
+  const editing = !!id && id !== 'new'
+  const { data: existing, isLoading, error } = useCustomer(editing ? id : undefined)
+  const { createM, updateM } = useCustomerMutations()
+  const { push } = useNotifications()
   const [customer, setCustomer] = useState<Customer>(emptyCustomer)
   const [addresses, setAddresses] = useState<CustomerAddress[]>([])
   const [contacts, setContacts] = useState<CustomerContact[]>([])
 
   const update = (patch: Partial<Customer>) => setCustomer(c => ({ ...c, ...patch, updatedAt: new Date().toISOString() }))
 
-  const save = () => {
-    // TODO integrate API
-    navigate('/customers')
+  useEffect(() => {
+    if (existing && editing) {
+      setCustomer(c => ({
+        ...c,
+        id: String(existing.id),
+        name: existing.name ?? c.name,
+        email: existing.email,
+        phone: existing.phone,
+        status: (c.status || 'Active'),
+      }))
+    }
+  }, [existing, editing])
+
+  const save = async () => {
+    if (!customer.name.trim()) {
+      push({ level: 'error', message: 'Name is required.' })
+      return
+    }
+    try {
+      if (editing && existing) {
+        await updateM.mutateAsync({ id: existing.id, payload: { name: customer.name, email: customer.email, phone: customer.phone } })
+        push({ level: 'success', message: 'Customer updated.' })
+      } else {
+        await createM.mutateAsync({ name: customer.name, email: customer.email, phone: customer.phone })
+        push({ level: 'success', message: 'Customer created.' })
+      }
+      navigate('/customers')
+    } catch (e: any) {
+      push({ level: 'error', message: e.message || 'Could not save customer.' })
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight text-neutral-800">{editing ? 'Edit Customer' : 'New Customer'}</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-neutral-800">{editing ? (isLoading ? 'Loading...' : customer.name || 'Edit Customer') : 'New Customer'}</h1>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => navigate(-1)}>Cancel</Button>
-          <Button size="sm" onClick={save}>{editing ? 'Save' : 'Create'}</Button>
+          <Button variant="secondary" size="sm" onClick={() => navigate(-1)} disabled={createM.isPending || updateM.isPending}>Cancel</Button>
+          <Button size="sm" onClick={save} loading={createM.isPending || updateM.isPending}>{editing ? 'Save' : 'Create'}</Button>
         </div>
       </div>
+  {error ? <div className="rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700">Failed to load customer.</div> : null}
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 space-y-6">
           <FormSection id="basic" title="Basic Information">

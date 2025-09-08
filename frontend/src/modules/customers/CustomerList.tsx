@@ -1,35 +1,28 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { DataTable } from '../../components/tables/DataTable'
 import type { DataTableColumn } from '../../components/tables/DataTable'
 import type { Customer } from './types'
 import { Button } from '../../components/ui/Button'
 import { useNavigate } from 'react-router-dom'
-
-// Temporary mock data
-const mockCustomers: Customer[] = Array.from({ length: 42 }).map((_, i) => ({
-  id: String(i+1),
-  name: `Customer ${i+1}`,
-  email: i % 3 === 0 ? `customer${i+1}@mail.com` : undefined,
-  phone: i % 4 === 0 ? `98765${(10000 + i).toString().slice(-5)}` : undefined,
-  status: i % 7 === 0 ? 'Disabled' : 'Active',
-  type: i % 5 === 0 ? 'Individual' : 'Company',
-  territory: ['North','South','East','West'][i % 4],
-  customerGroup: ['Retail','Wholesale','Online'][i % 3],
-  creditLimit: 50000,
-  paymentTerms: 'Net 30',
-  gstin: i % 6 === 0 ? '29ABCDE1234F2Z5' : undefined,
-  gstState: 'Karnataka',
-  createdAt: new Date(Date.now() - i * 86400000).toISOString(),
-  updatedAt: new Date().toISOString(),
-  balance: i % 5 === 0 ? 1200.55 : 0,
-  currency: '₹',
-  addresses: [],
-  contacts: [],
-}))
+import { useCustomers } from '../../hooks/useCustomers'
 
 const CustomerList: React.FC = () => {
   const navigate = useNavigate()
-  const [data] = useState<Customer[]>(mockCustomers)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const pageSize = 25
+
+  // debounce search input
+  // lightweight debounce without external util
+  const debounceRef = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current)
+    debounceRef.current = window.setTimeout(() => setDebouncedSearch(search), 400)
+    return () => { if (debounceRef.current) window.clearTimeout(debounceRef.current) }
+  }, [search])
+
+  const { items, total, isLoading, isFetching, error } = useCustomers({ page, page_size: pageSize, search: debouncedSearch })
 
   const columns: DataTableColumn<Customer>[] = useMemo(() => ([
     { key: 'name', header: 'Name', render: c => <span className="font-medium text-neutral-800">{c.name}</span> },
@@ -48,13 +41,48 @@ const CustomerList: React.FC = () => {
     ) }
   ]), [navigate])
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-lg font-semibold tracking-tight text-neutral-800">Customers</h1>
-        <Button size="sm" onClick={() => navigate('/customers/new')}>New Customer</Button>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-lg font-semibold tracking-tight text-neutral-800">Customers</h1>
+          {isFetching && !isLoading && <span className="text-[10px] text-neutral-400">Refreshing…</span>}
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <input
+            placeholder="Search customers..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            className="h-9 flex-1 md:w-64 rounded-md border border-neutral-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40"
+          />
+          <Button size="sm" onClick={() => navigate('/customers/new')}>New Customer</Button>
+        </div>
       </div>
-      <DataTable columns={columns} data={data} exportable responsiveCards />
+      {error && (
+        <div className="rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700">
+          Failed to load customers. <button className="underline" onClick={() => window.location.reload()}>Retry</button>
+        </div>
+      )}
+      {isLoading ? (
+        <div className="grid gap-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-12 animate-pulse rounded-md bg-neutral-100" />
+          ))}
+        </div>
+      ) : (
+        <>
+          <DataTable columns={columns} data={items as Customer[]} exportable responsiveCards />
+          <div className="flex items-center justify-between text-xs text-neutral-600 mt-2">
+            <span>Page {page} of {totalPages}</span>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="secondary" disabled={page===1} onClick={() => setPage(p=>p-1)}>Prev</Button>
+              <Button size="sm" variant="secondary" disabled={page===totalPages} onClick={() => setPage(p=>p+1)}>Next</Button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
