@@ -3,10 +3,12 @@ import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 
 interface MainLayoutProps {
-  children: React.ReactNode
+  children?: React.ReactNode
   company?: { name: string; avatarUrl?: string }
   user?: { name: string; role?: string; avatarUrl?: string }
 }
+
+import { Outlet } from 'react-router-dom'
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ children, company, user }) => {
   const [collapsed, setCollapsed] = useState(false)
@@ -41,7 +43,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children, company, user 
           user={user}
         />
         <main className="flex-1 overflow-y-auto px-4 py-6 md:px-8 bg-neutral-50">
-          {children}
+          {children ?? <Outlet />}
         </main>
       </div>
     </div>
