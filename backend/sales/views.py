@@ -22,7 +22,9 @@ from decimal import Decimal
 from accounting.models import ARInvoice, ARPaymentAllocation
 
 from .models import Customer
+from .models import SalesOrder
 from .serializers import CustomerSerializer
+from .serializers import SalesOrderSerializer
 
 
 class DefaultPagination(PageNumberPagination):
@@ -119,3 +121,79 @@ class CustomerViewSet(viewsets.ModelViewSet):
             'currency': 'INR',
         }
         return Response(data)
+
+class SalesOrderViewSet(viewsets.ModelViewSet):
+    queryset = SalesOrder.objects.prefetch_related('lines__product', 'customer').all()
+    serializer_class = SalesOrderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['order_number', 'customer__name']
+    ordering_fields = ['order_date', 'created_at', 'total_amount']
+    ordering = ['-order_date']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        params = self.request.query_params
+        status_val = params.get('status')
+        customer_id = params.get('customer')
+        date_from = params.get('order_date_from')
+        date_to = params.get('order_date_to')
+        if status_val:
+            qs = qs.filter(status=status_val)
+        if customer_id:
+            qs = qs.filter(customer_id=customer_id)
+        if date_from:
+            qs = qs.filter(order_date__gte=date_from)
+        if date_to:
+            qs = qs.filter(order_date__lte=date_to)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def confirm(self, request, pk=None):
+        order = self.get_object()
+        if not order.can_confirm():
+            return Response({'detail': 'Cannot confirm order in its current state.'}, status=400)
+        order.confirm(user=request.user)
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        order = self.get_object()
+        if not order.can_cancel():
+            return Response({'detail': 'Cannot cancel order in its current state.'}, status=400)
+        order.cancel(user=request.user)
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=['post'])
+    def deliver(self, request, pk=None):
+        order = self.get_object()
+        if not order.can_mark_delivered():
+            return Response({'detail': 'Cannot mark delivered in its current state.'}, status=400)
+        order.mark_delivered(user=request.user)
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=False, methods=['post'], url_path='bulk-confirm')
+    def bulk_confirm(self, request):
+        ids = request.data.get('ids', [])
+        updated = []
+        for order in SalesOrder.objects.filter(id__in=ids):
+            if order.can_confirm():
+                order.confirm(user=request.user)
+                updated.append(order.id)
+        return Response({'updated': updated})
+
+    @action(detail=False, methods=['post'], url_path='bulk-cancel')
+    def bulk_cancel(self, request):
+        ids = request.data.get('ids', [])
+        updated = []
+        for order in SalesOrder.objects.filter(id__in=ids):
+            if order.can_cancel():
+                order.cancel(user=request.user)
+                updated.append(order.id)
+        return Response({'updated': updated})
