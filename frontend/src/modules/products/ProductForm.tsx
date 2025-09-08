@@ -1,9 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Button } from '../../components/ui/Button'
 import { ImageGallery } from './components/ImageGallery'
 import { VariantManager, type ProductVariant } from './components/VariantManager'
 import { FormSection } from '../../components/forms'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useProduct } from '../../hooks/useInventory'
+import { useNotifications } from '../../contexts/NotificationContext'
+import { useInventoryMutations } from '../../hooks/useInventory'
 
 interface ProductDraft {
   id: string
@@ -34,24 +37,54 @@ const ProductForm: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams()
   const editing = !!id && id !== 'new'
+  const { data: existing, isLoading, error } = useProduct(editing ? id : undefined)
+  const { updateProd } = useInventoryMutations()
+  const { push } = useNotifications()
   const [product, setProduct] = useState<ProductDraft>(empty)
 
   const update = (patch: Partial<ProductDraft>) => setProduct(p => ({ ...p, ...patch }))
 
-  const save = () => {
-    // TODO: integrate API
-    navigate('/products')
+  useEffect(() => {
+    if (existing && editing) {
+      setProduct(p => ({
+        ...p,
+        id: String(existing.id),
+        name: existing.name || p.name,
+        code: existing.sku || p.code,
+        description: existing.description,
+      }))
+    }
+  }, [existing, editing])
+
+  const save = async () => {
+    if (!product.name.trim()) {
+      push({ level: 'error', message: 'Name required.' })
+      return
+    }
+    try {
+      if (editing && existing) {
+        await updateProd.mutateAsync({ id: existing.id, payload: { name: product.name, description: product.description } })
+        push({ level: 'success', message: 'Product updated.' })
+      } else {
+        // Creation endpoint not yet implemented in hook (would call createProduct) – placeholder
+        push({ level: 'success', message: 'Product created (placeholder).' })
+      }
+      navigate('/products')
+    } catch (e: any) {
+      push({ level: 'error', message: e.message || 'Save failed.' })
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight text-neutral-800">{editing ? 'Edit Product' : 'New Product'}</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-neutral-800">{editing ? (isLoading ? 'Loading...' : product.name || 'Edit Product') : 'New Product'}</h1>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-            <Button size="sm" onClick={save}>{editing ? 'Save' : 'Create'}</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate(-1)} disabled={updateProd.isPending}>Cancel</Button>
+            <Button size="sm" onClick={save} loading={updateProd.isPending}>{editing ? 'Save' : 'Create'}</Button>
         </div>
       </div>
+      {error ? <div className="rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700">Failed to load product.</div> : null}
       <div className="grid gap-6 md:grid-cols-3">
         <div className="space-y-6 md:col-span-2">
           <FormSection id="basic" title="Basic Information">
