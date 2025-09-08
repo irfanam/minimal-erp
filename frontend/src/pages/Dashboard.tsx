@@ -27,7 +27,7 @@ const initialWidgets: DashboardWidgetInstance[] = [
 const COLS = 12
 const ROW_HEIGHT = 110
 
-export const Dashboard: React.FC = () => {
+const Dashboard: React.FC = () => {
   const [widgets, setWidgets] = useState<DashboardWidgetInstance[]>(() => initialWidgets)
   const [dragging, setDragging] = useState<string | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
@@ -95,3 +95,5 @@ export const Dashboard: React.FC = () => {
     </div>
   )
 }
+
+export default Dashboard

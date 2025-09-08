@@ -28,7 +28,7 @@ const mockInvoices: Invoice[] = Array.from({ length: 28 }).map((_, i) => ({
   currency: '₹'
 }))
 
-export const InvoiceList: React.FC = () => {
+const InvoiceList: React.FC = () => {
   const [customerFilter, setCustomerFilter] = useState('')
   const filtered = mockInvoices.filter(i => !customerFilter || i.customer === customerFilter)
 
@@ -61,3 +61,5 @@ export const InvoiceList: React.FC = () => {
     </div>
   )
 }
+
+export default InvoiceList

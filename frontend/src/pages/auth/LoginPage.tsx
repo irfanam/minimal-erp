@@ -3,7 +3,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { useNavigate, Navigate } from 'react-router-dom'
 
-export const LoginPage: React.FC = () => {
+const LoginPage: React.FC = () => {
   const { login, loading, error, user, initialized } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -75,6 +75,8 @@ export const LoginPage: React.FC = () => {
     </div>
   )
 }
+
+export default LoginPage
 
 const Feature: React.FC<{title: string}> = ({ title }) => (
   <div className="flex items-center gap-2 p-2 rounded-md bg-white/60 backdrop-blur border border-neutral-200 shadow-sm">

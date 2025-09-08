@@ -17,7 +17,7 @@ const emptyCustomer: Customer = {
   contacts: []
 }
 
-export const CustomerForm: React.FC = () => {
+const CustomerForm: React.FC = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const editing = id && id !== 'new'
@@ -123,3 +123,5 @@ export const CustomerForm: React.FC = () => {
     </div>
   )
 }
+
+export default CustomerForm

@@ -21,7 +21,7 @@ interface Draft {
 
 const empty: Draft = { id: 'new', type: 'IN', items: [] }
 
-export const StockEntry: React.FC = () => {
+const StockEntry: React.FC = () => {
   const [draft, setDraft] = useState<Draft>(empty)
   const [scan, setScan] = useState('')
 
@@ -125,3 +125,5 @@ export const StockEntry: React.FC = () => {
     </div>
   )
 }
+
+export default StockEntry

@@ -26,7 +26,7 @@ const mockOrders: SalesOrder[] = Array.from({ length: 34 }).map((_, i) => ({
   deliveryStatus: (['Pending','Partially Delivered','Delivered'] as const)[i % 3]
 }))
 
-export const SalesOrderList: React.FC = () => {
+const SalesOrderList: React.FC = () => {
   const [customerFilter, setCustomerFilter] = useState('')
   const filtered = mockOrders.filter(o => !customerFilter || o.customer === customerFilter)
 
@@ -64,3 +64,5 @@ export const SalesOrderList: React.FC = () => {
     </div>
   )
 }
+
+export default SalesOrderList

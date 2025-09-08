@@ -10,7 +10,7 @@ const mockStock: StockItem[] = Array.from({ length: 12 }).map((_, i) => ({
   reorderLevel: 60
 }))
 
-export const InventoryDashboard: React.FC = () => {
+const InventoryDashboard: React.FC = () => {
   const low = mockStock.filter(s => s.quantity <= s.reorderLevel)
   const top = [...mockStock].sort((a,b) => b.quantity - a.quantity).slice(0,5)
   const slow = [...mockStock].sort((a,b) => a.quantity - b.quantity).slice(0,5)
@@ -75,3 +75,5 @@ export const InventoryDashboard: React.FC = () => {
     </div>
   )
 }
+
+export default InventoryDashboard

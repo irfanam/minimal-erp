@@ -18,7 +18,7 @@ const mockProducts: ProductSummary[] = Array.from({ length: 36 }).map((_, i) => 
   reorderLevel: 40
 }))
 
-export const ProductList: React.FC = () => {
+const ProductList: React.FC = () => {
   const [data] = useState<ProductSummary[]>(mockProducts)
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
@@ -70,3 +70,5 @@ export const ProductList: React.FC = () => {
     </div>
   )
 }
+
+export default ProductList

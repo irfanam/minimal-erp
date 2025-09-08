@@ -22,7 +22,7 @@ const filterDefs: FilterDefinition[] = [
   { field: 'category', label: 'Category', type: 'select', options: Object.keys(categories) }
 ]
 
-export const ReportsHub: React.FC = () => {
+const ReportsHub: React.FC = () => {
   const [active, setActive] = useState<string>('Sales Report')
   const [favorites, setFavorites] = useState<string[]>([])
   const [recent, setRecent] = useState<string[]>([])
@@ -105,3 +105,5 @@ export const ReportsHub: React.FC = () => {
     </div>
   )
 }
+
+export default ReportsHub

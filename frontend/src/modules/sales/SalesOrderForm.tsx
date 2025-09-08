@@ -23,7 +23,7 @@ const empty: DraftOrder = {
   items: []
 }
 
-export const SalesOrderForm: React.FC = () => {
+const SalesOrderForm: React.FC = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const editing = !!id && id !== 'new'
@@ -103,3 +103,5 @@ export const SalesOrderForm: React.FC = () => {
     </div>
   )
 }
+
+export default SalesOrderForm

@@ -30,7 +30,7 @@ const empty: ProductDraft = {
   variants: []
 }
 
-export const ProductForm: React.FC = () => {
+const ProductForm: React.FC = () => {
   const navigate = useNavigate()
   const { id } = useParams()
   const editing = !!id && id !== 'new'
@@ -128,3 +128,5 @@ export const ProductForm: React.FC = () => {
     </div>
   )
 }
+
+export default ProductForm

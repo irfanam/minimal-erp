@@ -34,7 +34,7 @@ const mockMetrics: CustomerMetricSummary = {
   avgPaymentDays: 18
 }
 
-export const CustomerDetail: React.FC = () => {
+const CustomerDetail: React.FC = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const customer = mockCustomer // would fetch by id
@@ -87,3 +87,5 @@ export const CustomerDetail: React.FC = () => {
     </div>
   )
 }
+
+export default CustomerDetail

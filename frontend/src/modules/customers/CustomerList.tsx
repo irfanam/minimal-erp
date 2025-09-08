@@ -27,7 +27,7 @@ const mockCustomers: Customer[] = Array.from({ length: 42 }).map((_, i) => ({
   contacts: [],
 }))
 
-export const CustomerList: React.FC = () => {
+const CustomerList: React.FC = () => {
   const navigate = useNavigate()
   const [data] = useState<Customer[]>(mockCustomers)
 
@@ -58,3 +58,5 @@ export const CustomerList: React.FC = () => {
     </div>
   )
 }
+
+export default CustomerList

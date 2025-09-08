@@ -24,7 +24,7 @@ const empty: DraftInvoice = {
   items: []
 }
 
-export const InvoiceForm: React.FC = () => {
+const InvoiceForm: React.FC = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const editing = !!id && id !== 'new'
@@ -92,3 +92,5 @@ export const InvoiceForm: React.FC = () => {
     </div>
   )
 }
+
+export default InvoiceForm
