@@ -26,7 +26,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   const positive = typeof change === 'number' && change > 0
   const negative = typeof change === 'number' && change < 0
   return (
-    <Card className={clsx('p-4 flex flex-col gap-2', muted && 'bg-neutral-50')} loading={loading} {...rest}>
+  <Card className={clsx('p-4 flex flex-col gap-2', muted && 'bg-neutral-50', className)} loading={loading} {...rest}>
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1 min-w-0">
           <p className="text-xs font-medium tracking-wide text-neutral-500 uppercase truncate">{label}</p>
