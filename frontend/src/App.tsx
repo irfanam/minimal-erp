@@ -9,6 +9,11 @@ import { CustomersLayout } from './modules/customers/CustomersLayout.tsx'
 import { CustomerList } from './modules/customers/CustomerList.tsx'
 import { CustomerDetail } from './modules/customers/CustomerDetail.tsx'
 import { CustomerForm } from './modules/customers/CustomerForm.tsx'
+// Product module
+import { ProductList } from './modules/products/ProductList.tsx'
+import { ProductForm } from './modules/products/ProductForm.tsx'
+import { InventoryDashboard } from './modules/products/InventoryDashboard.tsx'
+import { StockEntry } from './modules/products/StockEntry.tsx'
 
 function App() {
   return (
@@ -25,6 +30,10 @@ function App() {
                 <Route path="new" element={<CustomerForm />} />
                 <Route path=":id/edit" element={<CustomerForm />} />
               </Route>
+              <Route path="products" element={<div className="px-6 py-6"><ProductList /></div>} />
+              <Route path="products/new" element={<div className="px-6 py-6"><ProductForm /></div>} />
+              <Route path="inventory" element={<div className="px-6 py-6"><InventoryDashboard /></div>} />
+              <Route path="stock-entry" element={<div className="px-6 py-6"><StockEntry /></div>} />
             </Route>
           </Route>
           <Route path="*" element={<div className="text-sm text-neutral-500 p-6">Page not found</div>} />
