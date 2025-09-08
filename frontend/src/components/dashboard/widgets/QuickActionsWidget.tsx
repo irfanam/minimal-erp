@@ -2,7 +2,9 @@ import React from 'react'
 import { Button } from '../../ui/Button'
 import { PlusIcon, DocumentTextIcon, ArrowPathIcon, UserPlusIcon } from '@heroicons/react/24/outline'
 
-export const QuickActionsWidget: React.FC = () => {
+interface Props { metrics?: any; loading?: boolean; error?: string; fetching?: boolean }
+
+export const QuickActionsWidget: React.FC<Props> = () => {
   return (
     <div className="h-full flex flex-col rounded-md border border-neutral-200 bg-white p-4 shadow-sm">
       <h3 className="text-sm font-medium text-neutral-700 mb-3">Quick Actions</h3>

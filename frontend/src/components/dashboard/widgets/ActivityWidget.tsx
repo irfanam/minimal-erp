@@ -9,7 +9,11 @@ const data: ActivityItem[] = [
   { id: '4', user: 'Sara', action: 'Added new customer Globex', time: '1h ago' },
 ]
 
-export const ActivityWidget: React.FC = () => {
+interface Props { metrics?: any; loading?: boolean; error?: string; fetching?: boolean }
+
+export const ActivityWidget: React.FC<Props> = ({ loading, error }) => {
+  if (loading) return <div className="h-full flex flex-col rounded-md border border-neutral-200 bg-white p-4 shadow-sm"><div className="h-6 w-40 bg-neutral-100 animate-pulse mb-4" /><div className="space-y-2">{Array.from({length:4}).map((_,i)=><div key={i} className="h-6 bg-neutral-100 animate-pulse rounded" />)}</div></div>
+  if (error) return <div className="h-full flex flex-col rounded-md border border-neutral-200 bg-white p-4 shadow-sm text-xs text-red-600">Error loading activity</div>
   return (
     <div className="h-full flex flex-col rounded-md border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">

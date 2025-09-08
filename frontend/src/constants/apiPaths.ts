@@ -8,6 +8,7 @@ export const SEGMENTS = {
   AUTH: 'auth',
   ACCOUNTING: 'accounting',
   PURCHASES: 'purchases',
+  CORE: 'core',
 }
 
 // Helper to ensure single trailing slash (DRF style)
@@ -36,6 +37,12 @@ export const INVENTORY_PATHS = {
   productDetail: (id: string | number) => withSlash(`/${SEGMENTS.INVENTORY}/products/${id}`),
   inventory: () => withSlash(`/${SEGMENTS.INVENTORY}/inventory`),
   inventoryDetail: (id: string | number) => withSlash(`/${SEGMENTS.INVENTORY}/inventory/${id}`),
+}
+
+// Core / dashboard & search
+export const CORE_PATHS = {
+  dashboardMetrics: () => withSlash(`/${SEGMENTS.CORE}/dashboard/metrics`),
+  globalSearch: () => withSlash(`/${SEGMENTS.CORE}/search`),
 }
 
 // Generic paginated response shape (align with DRF default pagination keys if needed)

@@ -2,11 +2,21 @@ import React from 'react'
 import { ChartWidget } from './ChartWidget'
 import { LineChart } from '../charts/ChartBase'
 
-export const SalesWidget: React.FC = () => {
-  const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
-  const data = [1200, 1900, 1500, 2200, 1800, 2500, 2100]
+interface Props {
+  metrics?: any
+  loading?: boolean
+  error?: string
+  fetching?: boolean
+}
+
+export const SalesWidget: React.FC<Props> = ({ metrics, loading, error, fetching }) => {
+  const labels = ['Sales']
+  const total = metrics?.sales?.total_sales ? Number(metrics.sales.total_sales) : 0
+  const data = [total]
+  if (loading) return <ChartWidget title="Sales" subtitle="Loading" footer=""><div className="animate-pulse h-20 bg-neutral-100 rounded" /></ChartWidget>
+  if (error) return <ChartWidget title="Sales" subtitle="Error" footer=""><button className="text-[11px] text-red-600">{error}</button></ChartWidget>
   return (
-    <ChartWidget title="Sales" subtitle="Last 7 days" footer="Updated 5 min ago">
+    <ChartWidget title="Sales" subtitle="Period" footer={fetching ? 'Refreshing…' : 'Up to date'}>
       <LineChart labels={labels} data={data} />
     </ChartWidget>
   )
