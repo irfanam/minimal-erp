@@ -1,2 +1,4 @@
-// Table components exports placeholder
-export {}
+export * from './DataTable'
+export * from './TableFilters'
+export * from './TableActions'
+export * from './TablePagination'
