@@ -122,6 +122,19 @@ class CustomerViewSet(viewsets.ModelViewSet):
         }
         return Response(data)
 
+    # --- Bulk operations ---
+    @action(detail=False, methods=['post'], url_path='bulk-activate')
+    def bulk_activate(self, request):
+        ids = request.data.get('ids', [])
+        updated = Customer.objects.filter(id__in=ids).update(is_active=True)
+        return Response({'updated': updated})
+
+    @action(detail=False, methods=['post'], url_path='bulk-deactivate')
+    def bulk_deactivate(self, request):
+        ids = request.data.get('ids', [])
+        updated = Customer.objects.filter(id__in=ids).update(is_active=False)
+        return Response({'updated': updated})
+
 class SalesOrderViewSet(viewsets.ModelViewSet):
     queryset = SalesOrder.objects.prefetch_related('lines__product', 'customer').all()
     serializer_class = SalesOrderSerializer
@@ -197,3 +210,23 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
                 order.cancel(user=request.user)
                 updated.append(order.id)
         return Response({'updated': updated})
+
+    @action(detail=False, methods=['post'], url_path='bulk-status')
+    def bulk_status(self, request):
+        ids = request.data.get('ids', [])
+        status_val = request.data.get('status')
+        changed = []
+        for order in SalesOrder.objects.filter(id__in=ids):
+            try:
+                if status_val == SalesOrder.Status.CONFIRMED and order.can_confirm():
+                    order.confirm(user=request.user)
+                    changed.append(order.id)
+                elif status_val == SalesOrder.Status.CANCELLED and order.can_cancel():
+                    order.cancel(user=request.user)
+                    changed.append(order.id)
+                elif status_val == SalesOrder.Status.DELIVERED and order.can_mark_delivered():
+                    order.mark_delivered(user=request.user)
+                    changed.append(order.id)
+            except Exception:
+                continue
+        return Response({'updated': changed})

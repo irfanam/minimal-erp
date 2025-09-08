@@ -32,6 +32,24 @@ class ProductViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
+    @action(detail=False, methods=['post'], url_path='bulk-price-update')
+    def bulk_price_update(self, request):
+        updates = request.data.get('updates', [])
+        changed = []
+        for upd in updates:
+            pid = upd.get('id')
+            price = upd.get('selling_price')
+            if pid and price is not None:
+                try:
+                    obj = Product.objects.get(id=pid)
+                    obj.selling_price = price
+                    obj.updated_by = request.user
+                    obj.save(update_fields=['selling_price', 'updated_at', 'updated_by'])
+                    changed.append(obj.id)
+                except Product.DoesNotExist:
+                    continue
+        return Response({'updated': changed})
+
 
 class InventoryViewSet(viewsets.ModelViewSet):
     queryset = Inventory.objects.select_related('product', 'created_by', 'updated_by').all()
