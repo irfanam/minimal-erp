@@ -19,12 +19,23 @@ export function clearAuthTokens() {
 
 interface TokenRefreshResponse { access: string; refresh?: string }
 
-const apiBaseURL = '/api'
+// Determine base URL: allow environment override (e.g., VITE_API_BASE) while ensuring trailing /api/
+const RAW_BASE = (import.meta as any).env?.VITE_API_BASE || ''
+function ensureApiBase(base: string) {
+  if (!base) return '/api/'
+  // strip trailing slashes then append / if missing
+  let b = base.replace(/\/+$/, '')
+  // if base already ends with /api or /api/, keep single /api/
+  if (/\/api$/i.test(b)) return b + '/'
+  return b + '/api/'
+}
+const apiBaseURL = ensureApiBase(RAW_BASE)
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: apiBaseURL,
   timeout: 15000,
   withCredentials: true,
+  headers: { 'Accept': 'application/json' }
 })
 
 apiClient.interceptors.request.use(cfg => {
@@ -49,7 +60,7 @@ function resolveQueue(newToken: string | null) {
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null
   try {
-    const { data } = await axios.post<TokenRefreshResponse>(`${apiBaseURL}/auth/refresh`, { refresh: refreshToken })
+  const { data } = await axios.post<TokenRefreshResponse>(`${apiBaseURL}auth/refresh/`, { refresh: refreshToken })
     setAuthTokens({ access: data.access, refresh: data.refresh })
     return data.access
   } catch (e) {
