@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useGlobalSearch } from '../../hooks/useGlobalSearch'
 
 interface SearchItem { id: string | number; type: string; label: string; route: string; recent?: boolean }
@@ -53,20 +53,22 @@ export const GlobalSearch: React.FC<Props> = ({ onNavigate }) => {
     setQuery('')
   }
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault(); setOpen(o => !o); setTimeout(() => ref.current?.querySelector('input')?.focus(), 10)
-      } else if (open) {
-        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min(results.length -1, a+1)) }
-        if (e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, a-1)) }
-        if (e.key === 'Enter') { e.preventDefault(); const item = results[active]; if (item) choose(item) }
-        if (e.key === 'Escape') { setOpen(false) }
-      }
+  const keyHandler = useCallback((e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault(); setOpen(o => !o); setTimeout(() => ref.current?.querySelector('input')?.focus(), 10)
+      return
     }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [open, results, active])
+    if (!open) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive(a => Math.min((query ? backendResults : recent).length -1, a+1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(a => Math.max(0, a-1)) }
+    else if (e.key === 'Enter') { e.preventDefault(); const list = query ? backendResults : recent; const item = list[active]; if (item) choose(item) }
+    else if (e.key === 'Escape') { setOpen(false) }
+  }, [open, active, query, backendResults, recent])
+
+  useEffect(() => {
+    window.addEventListener('keydown', keyHandler)
+    return () => window.removeEventListener('keydown', keyHandler)
+  }, [keyHandler])
 
   return (
     <>

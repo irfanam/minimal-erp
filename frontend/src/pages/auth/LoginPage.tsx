@@ -15,7 +15,7 @@ const LoginPage: React.FC = () => {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await login({ username, password })
+  await login({ username, password, remember })
       if (remember) {
         // Basic persistence of username (token persistence handled inside services if added later)
         localStorage.setItem('last_username', username)

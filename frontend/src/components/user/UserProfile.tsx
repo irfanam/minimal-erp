@@ -1,23 +1,25 @@
 import React, { Fragment } from 'react'
 import { Menu, Transition } from '@headlessui/react'
 import { ArrowRightOnRectangleIcon, Cog6ToothIcon, KeyIcon, UserCircleIcon } from '@heroicons/react/24/outline'
-import { useAuth } from '../../auth/AuthContext'
+import { useAuth } from '../../hooks/useAuth'
 import clsx from 'clsx'
 
 export const UserProfile: React.FC = () => {
   const { user, logout } = useAuth()
   if (!user) return null
-  const initials = user.name.split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase()
+  // Backend user fields: first_name, last_name, username, email, role, avatar
+  const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || user.username
+  const initials = displayName.split(/\s+/).filter(Boolean).map((p: string) => p[0]!).slice(0,2).join('').toUpperCase()
   return (
     <Menu as="div" className="relative inline-block text-left">
       <Menu.Button className="inline-flex items-center gap-2 px-2 py-1 rounded-md hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-primary-500">
-        {user.avatarUrl ? (
-          <img src={user.avatarUrl} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
+        {user.avatar ? (
+          <img src={user.avatar} alt={displayName} className="h-8 w-8 rounded-full object-cover" />
         ) : (
           <span className="h-8 w-8 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs font-semibold">{initials}</span>
         )}
         <span className="flex flex-col items-start leading-tight">
-          <span className="text-xs font-medium text-neutral-800">{user.name}</span>
+          <span className="text-xs font-medium text-neutral-800">{displayName}</span>
           <span className="text-[10px] text-neutral-500">{user.role}</span>
         </span>
       </Menu.Button>
@@ -32,9 +34,9 @@ export const UserProfile: React.FC = () => {
       >
         <Menu.Items className="absolute right-0 z-30 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black/5 focus:outline-none divide-y divide-neutral-100">
           <div className="px-3 py-2">
-            <p className="text-xs font-medium text-neutral-700">{user.name}</p>
+            <p className="text-xs font-medium text-neutral-700">{displayName}</p>
             <p className="text-[10px] text-neutral-500">{user.email}</p>
-            {user.company && <p className="text-[10px] text-neutral-500 mt-1">{user.company}</p>}
+            {/* company not provided by backend yet */}
           </div>
           <div className="py-1">
             <MenuItem icon={<UserCircleIcon className="h-4 w-4" />}>Profile Settings</MenuItem>

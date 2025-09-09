@@ -3,7 +3,6 @@ import { queryClient } from '../../utils/queryClient'
 
 const DEV = import.meta.env.DEV
 
-// Basic token storage abstraction (can later be swapped for more secure storage)
 let accessToken: string | null = null
 let refreshToken: string | null = null
 
@@ -19,17 +18,31 @@ export function clearAuthTokens() {
 
 interface TokenRefreshResponse { access: string; refresh?: string }
 
-// Determine base URL: allow environment override (e.g., VITE_API_BASE) while ensuring trailing /api/
-const RAW_BASE = (import.meta as any).env?.VITE_API_BASE || ''
-function ensureApiBase(base: string) {
-  if (!base) return '/api/'
-  // strip trailing slashes then append / if missing
-  let b = base.replace(/\/+$/, '')
-  // if base already ends with /api or /api/, keep single /api/
-  if (/\/api$/i.test(b)) return b + '/'
-  return b + '/api/'
+// Resolve the effective API base URL according to environment:
+// 1. If VITE_API_BASE is provided, normalize and append /api/ (unless already ends with /api)
+// 2. If missing and in development, return '' so that the Vite dev proxy can handle paths.
+//    A request interceptor below will auto-prefix /api/ for relative (non-leading-slash) paths.
+// 3. If missing and in production, default to current origin + /api/ ("full backend URL").
+const RAW_BASE: string | undefined = (import.meta as any).env?.VITE_API_BASE?.trim()
+
+function resolveApiBase(): string {
+  if (RAW_BASE) {
+    let b = RAW_BASE.replace(/\/+$/, '')
+    if (/\/api$/i.test(b)) return b + '/'
+    return b + '/api/'
+  }
+  if (DEV) {
+    return '' // rely on dev proxy; we'll inject /api/ prefix for relative endpoints
+  }
+  // Production fallback: same-origin backend (adjust if deploying frontend separately)
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin.replace(/\/+$/, '') + '/api/'
+  }
+  // Conservative fallback (no window): just use /api/
+  return '/api/'
 }
-const apiBaseURL = ensureApiBase(RAW_BASE)
+
+const apiBaseURL = resolveApiBase()
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: apiBaseURL,
@@ -39,6 +52,20 @@ export const apiClient: AxiosInstance = axios.create({
 })
 
 apiClient.interceptors.request.use(cfg => {
+  // When using empty base (dev proxy mode) and the caller supplied a relative path
+  // without a leading slash, automatically prefix /api/ so existing service code
+  // that was written assuming a '/api/' base continues to work.
+  if (apiBaseURL === '' && cfg.url) {
+    if (cfg.url.startsWith('/')) {
+      // Absolute root path: ensure it is routed via /api proxy
+      if (!cfg.url.startsWith('/api/')) {
+        cfg.url = '/api' + cfg.url
+      }
+    } else {
+      // Relative path: prefix /api/
+      cfg.url = '/api/' + cfg.url.replace(/^\/+/, '')
+    }
+  }
   if (accessToken) {
     cfg.headers = cfg.headers || {}
     cfg.headers['Authorization'] = `Bearer ${accessToken}`
@@ -60,7 +87,8 @@ function resolveQueue(newToken: string | null) {
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null
   try {
-  const { data } = await axios.post<TokenRefreshResponse>(`${apiBaseURL}auth/refresh/`, { refresh: refreshToken })
+    // Use apiClient so request interceptor can adapt path in dev proxy mode
+    const { data } = await apiClient.post<TokenRefreshResponse>('auth/refresh/', { refresh: refreshToken })
     setAuthTokens({ access: data.access, refresh: data.refresh })
     return data.access
   } catch (e) {

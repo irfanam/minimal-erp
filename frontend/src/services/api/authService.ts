@@ -15,13 +15,23 @@ export interface UserProfile {
 }
 export interface AuthResponse { access: string; refresh?: string; user: UserProfile }
 
-const AUTH_PREFIX = '/auth'
+// Relative so the apiClient interceptor can prepend /api/ in dev proxy mode
+const AUTH_PREFIX = 'auth'
 
-export async function login(payload: LoginPayload): Promise<AuthResponse> {
-  // Django endpoint expects trailing slash
-  const { data } = await apiClient.post<AuthResponse>(`${AUTH_PREFIX}/login/`, payload)
-  setAuthTokens({ access: data.access, refresh: data.refresh })
-  return data
+export async function login(payload: LoginPayload & { remember?: boolean }): Promise<AuthResponse> {
+  try {
+    const { data } = await apiClient.post<AuthResponse>(`${AUTH_PREFIX}/login/`, payload)
+    setAuthTokens({ access: data.access, refresh: data.refresh })
+    // Optional persistence for silent reload (refresh token typically httpOnly cookie; access persisted only if needed)
+    if (payload.remember) {
+      try { localStorage.setItem('auth_access', data.access); if (data.refresh) localStorage.setItem('auth_refresh', data.refresh) } catch {}
+    } else {
+      try { localStorage.removeItem('auth_access'); localStorage.removeItem('auth_refresh') } catch {}
+    }
+    return data
+  } catch (e) {
+    throw new Error(extractErrorMessage(e))
+  }
 }
 
 export async function logout(): Promise<void> {

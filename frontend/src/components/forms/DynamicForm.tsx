@@ -88,11 +88,17 @@ export function DynamicForm<T extends FieldValues = FieldValues>({
 
   // external controlled values
   useEffect(() => {
-    if (values) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  reset({ ...(defaultValues as any), ...(values as any) }, { keepDirty: true })
+    if (!values) return
+    // Shallow compare provided values with current form values to avoid needless resets
+    let changed = false
+    for (const k of Object.keys(values)) {
+      if ((values as any)[k] !== (allValues as any)[k]) { changed = true; break }
     }
-  }, [values, reset, defaultValues])
+    if (changed) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      reset({ ...(defaultValues as any), ...(values as any) }, { keepDirty: true })
+    }
+  }, [values, reset, defaultValues, allValues])
 
   const evaluate = useCallback((expr: any): any => {
     if (typeof expr === 'function') return expr(allValues)
@@ -105,7 +111,7 @@ export function DynamicForm<T extends FieldValues = FieldValues>({
   const debouncedChange = useCallback((vals: T, dirty: boolean) => {
     if (debounceRef.current) window.clearTimeout(debounceRef.current)
     debounceRef.current = window.setTimeout(() => {
-  onChange?.(vals, { dirty })
+      onChange?.(vals, { dirty })
       if (autoSave && dirty && onSubmit) {
         onSubmit(vals, 'autosave')
       }

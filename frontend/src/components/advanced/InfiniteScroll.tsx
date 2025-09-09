@@ -29,15 +29,15 @@ export function InfiniteScroll<T>({ loadMore, renderItem, initial = [], classNam
 
   useEffect(() => {
     const el = sentinel.current
-    if (!el) return
+    if (!el || done) return
     const observer = new IntersectionObserver(entries => {
       entries.forEach(entry => {
-        if (entry.isIntersecting) fetchMore()
+        if (entry.isIntersecting && !loading) fetchMore()
       })
     }, { rootMargin: '200px' })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [sentinel.current, cursor, loading, done])
+  }, [cursor, loading, done])
 
   return (
     <div className={`relative ${className}`}>
