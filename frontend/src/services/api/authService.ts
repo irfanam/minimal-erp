@@ -1,4 +1,4 @@
-import { apiClient, setAuthTokens, clearAuthTokens, extractErrorMessage } from './apiClient'
+import { apiClient, setAuthTokens, clearAuthTokens, extractErrorMessage, getRefreshToken } from './apiClient'
 
 // --- Types ---
 export interface LoginPayload { username: string; password: string }
@@ -46,8 +46,16 @@ export async function getProfile(): Promise<UserProfile> {
 
 export async function refreshSession(): Promise<{ access: string; refresh?: string }> {
   try {
-    const { data } = await apiClient.post<{ access: string; refresh?: string }>(`${AUTH_PREFIX}/refresh/`, {})
+    // Prefer in-memory refresh token; fall back to persisted one if user chose remember.
+    const token = getRefreshToken() || (() => { try { return localStorage.getItem('auth_refresh') } catch { return null } })()
+    if (!token) throw new Error('No refresh token available')
+    const { data } = await apiClient.post<{ access: string; refresh?: string }>(`${AUTH_PREFIX}/refresh/`, { refresh: token })
     setAuthTokens({ access: data.access, refresh: data.refresh })
+    // Keep persisted copies in sync if remember was used earlier.
+    try {
+      localStorage.setItem('auth_access', data.access)
+      if (data.refresh) localStorage.setItem('auth_refresh', data.refresh)
+    } catch { /* ignore quota / privacy errors */ }
     return data
   } catch (e) {
     throw new Error(extractErrorMessage(e))

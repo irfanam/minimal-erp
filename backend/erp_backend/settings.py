@@ -135,19 +135,29 @@ else:
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 8}},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+# Use Argon2 for strong password hashing (install django[argon2])
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
+# Production security settings (set these via env in production!)
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_SSL_REDIRECT = True
 
 
 # Internationalization
@@ -183,37 +193,38 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # --- Django REST Framework defaults (minimal, extend as needed) ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        # Use JWT tokens for stateless API auth
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        # Optional fallbacks for browsable API or admin usage
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
+    'EXCEPTION_HANDLER': 'erp_backend.utils.custom_exception_handler',
 }
 
-# --- CORS settings for local development ---
-# Allow your React dev server to call the API
+# --- CORS settings ---
+# Allow your React dev server and production frontend to call the API
 CORS_ALLOWED_ORIGINS = [
+    'https://your-production-frontend.com',  # <-- Set your real frontend domain in production
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    # Vite dev server
     'http://localhost:5173',
     'http://127.0.0.1:5173',
 ]
-# If you prefer to allow all origins during local dev, uncomment:
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies/credentials if needed
+# For local dev, you may use CORS_ALLOW_ALL_ORIGINS = True, but restrict in production!
 
 # --- Simple JWT settings ---
 # JWTs are signed tokens that prove identity. Access tokens are short-lived; refresh tokens get new access tokens.
+# For production, use a dedicated JWT_SIGNING_KEY (not Django SECRET_KEY)
+JWT_SIGNING_KEY = os.getenv('JWT_SIGNING_KEY', SECRET_KEY)
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),  # Shorter for security
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,       # Issue a new refresh token on refresh
     'BLACKLIST_AFTER_ROTATION': True,    # Old refresh token becomes invalid when rotated
     'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,           # Use Django SECRET_KEY (or set a JWT-specific key)
+    'SIGNING_KEY': JWT_SIGNING_KEY,      # Use dedicated key in production
     'AUTH_HEADER_TYPES': ('Bearer',),    # Clients send: Authorization: Bearer <token>
 }

@@ -7,17 +7,15 @@ from django.db import models
 
 class User(AbstractUser):
     """
-    Custom user model extending Django's AbstractUser.
+    Custom user model for authentication and profile.
 
-    We add:
-    - role: simple role field for coarse-grained authorization
-    - department: free-text department name
-    - phone: normalized phone string (basic validation)
-    - avatar: optional user profile image
+    Extends Django's AbstractUser and adds:
+    - role: Coarse-grained role for feature gating (admin/manager/staff)
+    - department: Free-text department name
+    - phone: Contact phone number (basic validation)
+    - avatar: Optional profile image
 
-    Notes:
-    - Keep Django's built-in permissions/groups working as-is.
-    - Provide helper methods to check permissions based on role.
+    All custom fields are included in the UserProfileSerializer for API responses.
     """
 
     # 1) Coarse-grained role choices for quick checks across the app

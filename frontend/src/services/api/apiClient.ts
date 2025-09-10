@@ -16,6 +16,11 @@ export function clearAuthTokens() {
   refreshToken = null
 }
 
+// Expose current in-memory refresh token for service layer helpers
+export function getRefreshToken(): string | null {
+  return refreshToken
+}
+
 interface TokenRefreshResponse { access: string; refresh?: string }
 
 // Resolve the effective API base URL according to environment:
@@ -90,6 +95,13 @@ async function refreshAccessToken(): Promise<string | null> {
     // Use apiClient so request interceptor can adapt path in dev proxy mode
     const { data } = await apiClient.post<TokenRefreshResponse>('auth/refresh/', { refresh: refreshToken })
     setAuthTokens({ access: data.access, refresh: data.refresh })
+    // If user originally opted for persistence (presence of auth_refresh), update stored tokens after rotation
+    try {
+      if (localStorage.getItem('auth_refresh')) {
+        localStorage.setItem('auth_access', data.access)
+        if (data.refresh) localStorage.setItem('auth_refresh', data.refresh)
+      }
+    } catch { /* ignore storage errors */ }
     return data.access
   } catch (e) {
     clearAuthTokens()

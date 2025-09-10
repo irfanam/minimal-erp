@@ -30,3 +30,4 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'id', 'username', 'first_name', 'last_name', 'email',
             'role', 'department', 'phone', 'avatar',
         )
+        read_only_fields = fields
