@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,6 +25,8 @@ SECRET_KEY = 'django-insecure-_b%09^9^+er2z28tflb7v2%ti52*%!@w1%t43zf@(#7s#9osrn
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+if 'pytest' in sys.modules:
+    DEBUG = True
 
 ALLOWED_HOSTS = []
 
@@ -52,8 +55,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS: must be high in the list
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -158,6 +161,10 @@ SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = True
+# Ensure SECURE_SSL_REDIRECT is False during tests (must be last)
+import sys
+if 'pytest' in sys.modules:
+    SECURE_SSL_REDIRECT = False
 
 
 # Internationalization
