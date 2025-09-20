@@ -1,9 +1,14 @@
 export interface User {
-  id: string
+  id: number | string
+  username: string
+  first_name: string
+  last_name: string
   email: string
-  name: string
-  role: string
-  avatarUrl?: string
+  role: 'admin' | 'manager' | 'staff'
+  department: string | null
+  phone: string | null
+  avatar: string | null
+  avatarUrl?: string // computed from avatar field
   company?: string
   permissions: string[]
 }
@@ -11,7 +16,7 @@ export interface User {
 export interface AuthTokens {
   access: string
   refresh: string
-  expiresAt: number // epoch ms for access token
+  expiresAt?: number // optional epoch ms for access token
 }
 
 export interface AuthState {

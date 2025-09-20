@@ -5,6 +5,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './hooks/useAuth'
+import { ToastProvider } from './components/notifications/ToastNotifications'
 import { queryClient } from './utils/queryClient'
 
 const Dashboard = React.lazy(() => import('./pages/Dashboard'))
@@ -28,7 +29,8 @@ function App() {
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-        <ErrorBoundary>
+          <ToastProvider>
+            <ErrorBoundary>
           <Suspense fallback={<div className="p-6 text-xs text-neutral-500">Loading...</div>}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
@@ -56,6 +58,7 @@ function App() {
             </Routes>
           </Suspense>
         </ErrorBoundary>
+          </ToastProvider>
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>

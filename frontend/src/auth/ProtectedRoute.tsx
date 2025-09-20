@@ -1,31 +1,48 @@
 import React from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
-// Updated to use new service-based auth hook
 import { useAuth } from '../hooks/useAuth'
 
 interface ProtectedRouteProps {
-  roles?: string[]
+  roles?: ('admin' | 'manager' | 'staff')[]
   permissions?: string[]
   redirectTo?: string
   loadingComponent?: React.ReactNode
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ roles, permissions, redirectTo = '/login', loadingComponent }) => {
-  const { user, loading } = useAuth()
-  const hasPermission = () => true // TODO: wire permission system when backend roles/claims ready
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  roles, 
+  permissions, 
+  redirectTo = '/login', 
+  loadingComponent 
+}) => {
+  const { user, loading, error } = useAuth()
 
-  if (loading) return (loadingComponent || <div className="flex items-center justify-center h-60 text-sm text-neutral-500">Loading...</div>)
+  if (loading) {
+    return (
+      loadingComponent || 
+      <div className="flex items-center justify-center h-60 text-sm text-neutral-500">
+        <div className="text-center space-y-2">
+          <div className="animate-spin h-6 w-6 border-2 border-primary-500 border-t-transparent rounded-full mx-auto"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
-  if (!user) {
+  if (error || !user) {
     return <Navigate to={redirectTo} replace />
   }
 
+  // Role-based access control
   if (roles && roles.length > 0 && !roles.includes(user.role)) {
-    return <Navigate to={redirectTo} replace />
+    console.warn(`User ${user.username} with role ${user.role} attempted to access route requiring roles:`, roles)
+    return <Navigate to="/unauthorized" replace />
   }
 
-  if (permissions && permissions.length > 0 && !hasPermission()) {
-    return <Navigate to={redirectTo} replace />
+  // TODO: Implement permission-based access control when backend supports it
+  if (permissions && permissions.length > 0) {
+    // For now, allow all authenticated users
+    // In the future, check user.permissions against required permissions
   }
 
   return <Outlet />

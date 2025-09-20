@@ -91,58 +91,87 @@ function resolveQueue(newToken: string | null) {
 
 async function refreshAccessToken(): Promise<string | null> {
   if (!refreshToken) return null
+  
   try {
-    // Use apiClient so request interceptor can adapt path in dev proxy mode
-    const { data } = await apiClient.post<TokenRefreshResponse>('auth/refresh/', { refresh: refreshToken })
+    const { data } = await apiClient.post<TokenRefreshResponse>('/auth/refresh/', { 
+      refresh: refreshToken 
+    })
+    
     setAuthTokens({ access: data.access, refresh: data.refresh })
-    // If user originally opted for persistence (presence of auth_refresh), update stored tokens after rotation
+    
+    // Update stored tokens if remember was enabled
     try {
-      if (localStorage.getItem('auth_refresh')) {
+      const rememberEnabled = localStorage.getItem('auth_remember') === 'true'
+      if (rememberEnabled) {
         localStorage.setItem('auth_access', data.access)
-        if (data.refresh) localStorage.setItem('auth_refresh', data.refresh)
+        if (data.refresh) {
+          localStorage.setItem('auth_refresh', data.refresh)
+        }
       }
-    } catch { /* ignore storage errors */ }
+    } catch (e) {
+      console.warn('Failed to update stored tokens:', e)
+    }
+    
     return data.access
   } catch (e) {
+    console.warn('Token refresh failed:', e)
     clearAuthTokens()
+    try {
+      localStorage.removeItem('auth_access')
+      localStorage.removeItem('auth_refresh')
+      localStorage.removeItem('auth_remember')
+    } catch {}
     return null
   }
 }
 
-apiClient.interceptors.response.use(r => {
-  if (DEV) {
-    // Lightweight success logging (can be silenced per domain later)
-    console.debug('[API]', r.status, r.config.method?.toUpperCase(), r.config.url)
-  }
-  return r
-}, async (error: AxiosError) => {
-  if (DEV) {
-    console.warn('[API ERROR]', error.response?.status, error.config?.url, error.message)
-  }
-  const original = error.config as any
-  if (error.response?.status === 401 && !original?._retry) {
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        enqueueRefresh(token => {
-          if (!token) return reject(error)
-          original.headers['Authorization'] = `Bearer ${token}`
-          resolve(apiClient(original))
-        })
-      })
+apiClient.interceptors.response.use(
+  r => {
+    if (DEV) {
+      console.debug('[API]', r.status, r.config.method?.toUpperCase(), r.config.url)
     }
-    original._retry = true
-    isRefreshing = true
-    const newToken = await refreshAccessToken()
-    isRefreshing = false
-    resolveQueue(newToken)
-    if (!newToken) return Promise.reject(error)
-    original.headers = original.headers || {}
-    original.headers['Authorization'] = `Bearer ${newToken}`
-    return apiClient(original)
+    return r
+  }, 
+  async (error: AxiosError) => {
+    if (DEV) {
+      console.warn('[API ERROR]', error.response?.status, error.config?.url, error.message)
+    }
+    
+    const original = error.config as any
+    
+    // Handle 401 errors with automatic token refresh
+    if (error.response?.status === 401 && !original?._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          enqueueRefresh(token => {
+            if (!token) return reject(error)
+            original.headers['Authorization'] = `Bearer ${token}`
+            resolve(apiClient(original))
+          })
+        })
+      }
+      
+      original._retry = true
+      isRefreshing = true
+      
+      const newToken = await refreshAccessToken()
+      isRefreshing = false
+      resolveQueue(newToken)
+      
+      if (!newToken) {
+        // Clear React Query cache on auth failure
+        queryClient.clear()
+        return Promise.reject(error)
+      }
+      
+      original.headers = original.headers || {}
+      original.headers['Authorization'] = `Bearer ${newToken}`
+      return apiClient(original)
+    }
+    
+    return Promise.reject(error)
   }
-  // Non-auth error propagation
-  return Promise.reject(error)
-})
+)
 
 // Global development request logger
 if (DEV) {
@@ -152,12 +181,53 @@ if (DEV) {
   })
 }
 
-// Global error translation helper
+// Enhanced error message extraction
 export function extractErrorMessage(err: any): string {
-  if (axios.isAxiosError(err)) {
-    return (err.response?.data as any)?.message || err.message || 'Request failed'
+  if (typeof err === 'string') return err
+  
+  // Handle Django REST framework error responses
+  if (err.response?.data) {
+    const data = err.response.data
+    
+    // Single error message
+    if (typeof data.error === 'string') return data.error
+    if (typeof data.detail === 'string') return data.detail
+    if (typeof data.message === 'string') return data.message
+    
+    // Field validation errors
+    if (typeof data === 'object') {
+      const fieldErrors = []
+      for (const [field, errors] of Object.entries(data)) {
+        if (Array.isArray(errors)) {
+          fieldErrors.push(`${field}: ${errors.join(', ')}`)
+        } else if (typeof errors === 'string') {
+          fieldErrors.push(`${field}: ${errors}`)
+        }
+      }
+      if (fieldErrors.length > 0) {
+        return fieldErrors.join('; ')
+      }
+    }
   }
-  return err?.message || 'Unknown error'
+  
+  // HTTP status messages
+  if (err.response?.status) {
+    switch (err.response.status) {
+      case 400: return 'Bad request. Please check your input.'
+      case 401: return 'Authentication required. Please log in.'
+      case 403: return 'You do not have permission to perform this action.'
+      case 404: return 'The requested resource was not found.'
+      case 500: return 'Server error. Please try again later.'
+      default: return `Request failed with status ${err.response.status}`
+    }
+  }
+  
+  // Network errors
+  if (err.code === 'NETWORK_ERROR' || err.message?.includes('Network Error')) {
+    return 'Network error. Please check your connection.'
+  }
+  
+  return err.message || 'An unexpected error occurred'
 }
 
 // Provide a helper to invalidate typical entity keys centrally
