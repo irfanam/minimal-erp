@@ -6,32 +6,36 @@ from django.db import models
 
 
 class User(AbstractUser):
-    """
-    Custom user model for authentication and profile.
+    """Custom user model extended with role-based access helpers.
 
-    Extends Django's AbstractUser and adds:
-    - role: Coarse-grained role for feature gating (admin/manager/staff)
-    - department: Free-text department name
-    - phone: Contact phone number (basic validation)
-    - avatar: Optional profile image
+    Added fields:
+    - role: One of (admin, manager, accountant, staff, viewer) controlling coarse permissions.
+    - department: Optional organizational grouping.
+    - phone, avatar: Profile enrichment (unchanged semantics).
 
-    All custom fields are included in the UserProfileSerializer for API responses.
+    Role Ladder (least → most privilege):
+        viewer → staff → accountant → manager → admin
+
+    IMPORTANT: Use the helper methods (can_edit_finances, can_approve_orders, etc.) rather than
+    comparing raw role strings elsewhere. This centralizes logic and eases future adjustments.
     """
 
     # 1) Coarse-grained role choices for quick checks across the app
     class Roles(models.TextChoices):
         ADMIN = "admin", "Admin"
         MANAGER = "manager", "Manager"
+        ACCOUNTANT = "accountant", "Accountant"
         STAFF = "staff", "Staff"
+        VIEWER = "viewer", "Viewer"
 
     role = models.CharField(
         max_length=20,
         choices=Roles.choices,
         default=Roles.STAFF,
         help_text=(
-            "Coarse-grained role: admin (highest), manager, staff. "
-            "Use this for quick feature gating."
+            "Coarse-grained role. Order of privilege (low→high): viewer < staff < accountant < manager < admin."
         ),
+        db_index=True,
     )
 
     # 2) Department information (simple free text)
@@ -64,46 +68,71 @@ class User(AbstractUser):
 
     # ---------- Helper methods for role-based checks ----------
     def is_admin(self) -> bool:
-        """
-        Check whether this account has the highest coarse-grained role.
-
-        Returns:
-            bool: True if role == ADMIN, otherwise False.
-
-        Beginner tips:
-        - Use this for high-level feature gates (e.g., can manage settings?).
-        - This does NOT replace Django's fine-grained permissions.
-        """
         return self.role == self.Roles.ADMIN
 
     def is_manager(self) -> bool:
-        """
-        Check whether this account has at least Manager privileges.
-
-        Returns:
-            bool: True if role is MANAGER or ADMIN, otherwise False.
-
-        Beginner tips:
-        - Useful for mid-tier access like approving documents.
-        - Admins also pass this check since they outrank managers.
-        """
         return self.role in {self.Roles.MANAGER, self.Roles.ADMIN}
 
+    def is_accountant(self) -> bool:
+        return self.role in {self.Roles.ACCOUNTANT, self.Roles.ADMIN}
+
     def is_staff_role(self) -> bool:
-        """Return True if the user is at least Staff (any role)."""
-        return self.role in {self.Roles.STAFF, self.Roles.MANAGER, self.Roles.ADMIN}
+        return self.role in {self.Roles.STAFF, self.Roles.ACCOUNTANT, self.Roles.MANAGER, self.Roles.ADMIN}
+
+    def is_viewer(self) -> bool:
+        return self.role == self.Roles.VIEWER
 
     def has_role(self, role: str) -> bool:
         """Generic role equality check (exact match)."""
         return self.role == role
 
     def has_role_at_least(self, role: str) -> bool:
-        """
-        Check if current role is >= the given role by a simple precedence order:
-        Admin > Manager > Staff
-        """
-        order = {self.Roles.STAFF: 1, self.Roles.MANAGER: 2, self.Roles.ADMIN: 3}
+        order = {
+            self.Roles.VIEWER: 1,
+            self.Roles.STAFF: 2,
+            self.Roles.ACCOUNTANT: 3,
+            self.Roles.MANAGER: 4,
+            self.Roles.ADMIN: 5,
+        }
         return order.get(self.role, 0) >= order.get(role, 0)
+
+    # ---- Capability helpers ----
+    def can_manage_users(self) -> bool:
+        return self.is_admin()
+
+    def can_edit_finances(self) -> bool:
+        return self.is_accountant() or self.is_manager() or self.is_admin()
+
+    def can_view_finances(self) -> bool:
+        return self.can_edit_finances() or self.is_staff_role() or self.is_viewer()
+
+    def can_approve_orders(self) -> bool:
+        return self.is_manager() or self.is_admin()
+
+    def can_edit_inventory(self) -> bool:
+        return self.is_manager() or self.is_admin()
+
+    def can_view_reports(self) -> bool:
+        return any([
+            self.is_admin(), self.is_manager(), self.is_accountant(), self.is_staff_role(), self.is_viewer()
+        ])
+
+    def can_create_transactions(self) -> bool:
+        return any([
+            self.is_staff_role(), self.is_accountant(), self.is_manager(), self.is_admin()
+        ])
+
+    def effective_capabilities(self) -> list[str]:
+        caps = []
+        if self.can_manage_users(): caps.append("manage_users")
+        if self.can_edit_finances(): caps.append("edit_finances")
+        if self.can_view_finances(): caps.append("view_finances")
+        if self.can_approve_orders(): caps.append("approve_orders")
+        if self.can_edit_inventory(): caps.append("edit_inventory")
+        if self.can_view_reports(): caps.append("view_reports")
+        if self.can_create_transactions(): caps.append("create_transactions")
+        if self.is_viewer(): caps.append("readonly")
+        return sorted(set(caps))
 
         def get_permissions(self) -> list[str]:
                 """

@@ -143,3 +143,35 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# --- Logging (extend existing logging config if present) ---
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'auth_rbac_file': {
+            'class': 'logging.FileHandler',
+            'filename': str(BASE_DIR / 'logs' / 'auth_rbac.log'),
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'auth.rbac': {
+            'handlers': ['console', 'auth_rbac_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+os.makedirs(BASE_DIR / 'logs', exist_ok=True)
