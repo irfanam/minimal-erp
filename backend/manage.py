@@ -5,8 +5,15 @@ import sys
 
 
 def main():
-    """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'erp_backend.settings')
+    """Run administrative tasks.
+
+    Defaults to development settings unless DJANGO_ENV indicates production.
+    """
+    if os.getenv('DJANGO_ENV','dev').lower() in ('prod','production'):
+        default_settings = 'erp_backend.settings_prod'
+    else:
+        default_settings = 'erp_backend.settings_dev'
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', default_settings)
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
