@@ -8,6 +8,7 @@ from __future__ import annotations
 from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from rest_framework.views import View
+from typing import Any
 import logging
 
 logger = logging.getLogger("auth.rbac")
@@ -91,4 +92,85 @@ __all__ = [
     "CanViewReports",
     "CanCreateTransactions",
     "ReadOnlyOrViewer",
+    "RoleScopedPermission",
 ]
+
+
+def _resolve_attr(obj: Any, dotted: str | None) -> Any:
+    """Safely traverse dotted/dunder paths (e.g., "customer__department")."""
+    if not obj or not dotted:
+        return None
+    current = obj
+    for part in dotted.split("__"):
+        current = getattr(current, part, None)
+        if current is None:
+            break
+    return current
+
+
+class RoleScopedPermission(_LoggingPermission):
+    """Grant baseline access to authenticated users while enforcing role-based scopes.
+
+    - ADMIN pass through automatically.
+    - MANAGER limited to department (direct field or creator's department).
+    - STAFF/VIEWER limited to record ownership (creator).
+
+    The permission logs every decision and captures denied attempts at WARNING level
+    for incident response.
+    """
+
+    message = "You do not have permission to perform this action."
+
+    def _deny(self, request: Request, *, reason: str, message: str | None = None):
+        if message:
+            self.message = message
+        user = getattr(request, "user", None)
+        logger.warning(
+            "rbac_denied user=%s role=%s dept=%s path=%s method=%s reason=%s",
+            getattr(user, "username", None),
+            getattr(user, "role", None),
+            getattr(user, "department", None),
+            request.path,
+            request.method,
+            reason,
+        )
+        return False
+
+    def has_permission(self, request: Request, view: View):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return self._deny(request, reason="not_authenticated", message="Authentication credentials were not provided.")
+        return self._log(request, True, "authenticated")
+
+    def has_object_permission(self, request: Request, view: View, obj: Any):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return self._deny(request, reason="not_authenticated_object", message="Authentication credentials were not provided.")
+
+        if user.is_admin():
+            return self._log(request, True, "admin access")
+
+        owner_field = getattr(view, "role_owner_field", "created_by")
+        department_field = getattr(view, "role_department_field", None)
+        owner = _resolve_attr(obj, owner_field)
+        owner_department = getattr(owner, "department", None)
+        department = _resolve_attr(obj, department_field) or owner_department
+
+        if user.is_manager():
+            if user.department and department and user.department != department:
+                return self._deny(
+                    request,
+                    reason="manager_out_of_department",
+                    message="Managers may only access records within their department.",
+                )
+            return self._log(request, True, "manager department access")
+
+        # STAFF/VIEWER: require direct ownership
+        if owner and owner == user:
+            return self._log(request, True, "owner access")
+
+        return self._deny(
+            request,
+            reason="owner_mismatch",
+            message="You may only access records you created.",
+        )

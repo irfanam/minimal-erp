@@ -11,7 +11,7 @@ All endpoints require authentication. Read operations are open to any
 authenticated user; write operations require manager/admin/superuser.
 """
 
-from rest_framework import viewsets, permissions, filters
+from rest_framework import viewsets, filters, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,6 +20,13 @@ from django.db.models import Q
 from decimal import Decimal
 
 from accounting.models import ARInvoice, ARPaymentAllocation
+
+from authentication.mixins import RoleScopedQuerysetMixin
+from authentication.permissions import (
+    RoleScopedPermission,
+    IsManagerOrAdmin,
+    CanApproveOrders,
+)
 
 from .models import Customer
 from .models import SalesOrder
@@ -35,29 +42,7 @@ class DefaultPagination(PageNumberPagination):
     max_page_size = 200
 
 
-class IsManagerOrAdmin(permissions.BasePermission):
-    """
-    Write access for managers/admins; read-only for other authenticated users.
-
-    - Unauthenticated: no access
-    - Safe methods (GET, HEAD, OPTIONS): any authenticated user
-    - Mutating methods (POST, PUT, PATCH, DELETE): superuser OR role=manager/admin
-    """
-
-    def has_permission(self, request, view):
-        user = request.user
-        if not user or not user.is_authenticated:
-            return False
-        # Safe methods are allowed to any authenticated user
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        # For write operations, allow Django superusers OR role manager/admin
-        if getattr(user, 'is_superuser', False):
-            return True
-        return getattr(user, 'is_admin', lambda: False)() or getattr(user, 'is_manager', lambda: False)()
-
-
-class CustomerViewSet(viewsets.ModelViewSet):
+class CustomerViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     """
     Customer API with full CRUD and useful list capabilities.
 
@@ -70,7 +55,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
 
     queryset = Customer.objects.all().select_related('created_by', 'updated_by')
     serializer_class = CustomerSerializer
-    permission_classes = [IsManagerOrAdmin]
+    permission_classes = [RoleScopedPermission]
     pagination_class = DefaultPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['customer_code', 'name', 'phone', 'email', 'gstin']
@@ -99,7 +84,7 @@ class CustomerViewSet(viewsets.ModelViewSet):
         serializer.save(updated_by=self.request.user)
 
     # --- Custom actions ---
-    @action(detail=True, methods=['get'], url_path='balance', permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['get'], url_path='balance', permission_classes=[RoleScopedPermission])
     def balance(self, request, pk=None):
         """
         Return the customer's current outstanding balance:
@@ -120,25 +105,31 @@ class CustomerViewSet(viewsets.ModelViewSet):
             'balance': balance_amount,
             'currency': 'INR',
         }
-        return Response(data)
+        return Response(data, status=status.HTTP_200_OK)
 
     # --- Bulk operations ---
-    @action(detail=False, methods=['post'], url_path='bulk-activate')
+    @action(detail=False, methods=['post'], url_path='bulk-activate', permission_classes=[RoleScopedPermission, IsManagerOrAdmin])
     def bulk_activate(self, request):
         ids = request.data.get('ids', [])
-        updated = Customer.objects.filter(id__in=ids).update(is_active=True)
-        return Response({'updated': updated})
+        records = list(self.get_queryset().filter(id__in=ids))
+        for obj in records:
+            self.check_object_permissions(request, obj)
+        updated = Customer.objects.filter(id__in=[obj.id for obj in records]).update(is_active=True)
+        return Response({'updated': updated}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], url_path='bulk-deactivate')
+    @action(detail=False, methods=['post'], url_path='bulk-deactivate', permission_classes=[RoleScopedPermission, IsManagerOrAdmin])
     def bulk_deactivate(self, request):
         ids = request.data.get('ids', [])
-        updated = Customer.objects.filter(id__in=ids).update(is_active=False)
-        return Response({'updated': updated})
+        records = list(self.get_queryset().filter(id__in=ids))
+        for obj in records:
+            self.check_object_permissions(request, obj)
+        updated = Customer.objects.filter(id__in=[obj.id for obj in records]).update(is_active=False)
+        return Response({'updated': updated}, status=status.HTTP_200_OK)
 
-class SalesOrderViewSet(viewsets.ModelViewSet):
+class SalesOrderViewSet(RoleScopedQuerysetMixin, viewsets.ModelViewSet):
     queryset = SalesOrder.objects.prefetch_related('lines__product', 'customer').all()
     serializer_class = SalesOrderSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [RoleScopedPermission]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['order_number', 'customer__name']
     ordering_fields = ['order_date', 'created_at', 'total_amount']
@@ -167,66 +158,69 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(updated_by=self.request.user)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[RoleScopedPermission, CanApproveOrders])
     def confirm(self, request, pk=None):
         order = self.get_object()
         if not order.can_confirm():
-            return Response({'detail': 'Cannot confirm order in its current state.'}, status=400)
+            return Response({'detail': 'Cannot confirm order in its current state.'}, status=status.HTTP_400_BAD_REQUEST)
         order.confirm(user=request.user)
-        return Response(self.get_serializer(order).data)
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[RoleScopedPermission, CanApproveOrders])
     def cancel(self, request, pk=None):
         order = self.get_object()
-        if not order.can_cancel():
-            return Response({'detail': 'Cannot cancel order in its current state.'}, status=400)
+        if not hasattr(order, 'can_cancel') or not order.can_cancel():
+            return Response({'detail': 'Cannot cancel order in its current state.'}, status=status.HTTP_400_BAD_REQUEST)
         order.cancel(user=request.user)
-        return Response(self.get_serializer(order).data)
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[RoleScopedPermission, CanApproveOrders])
     def deliver(self, request, pk=None):
         order = self.get_object()
-        if not order.can_mark_delivered():
-            return Response({'detail': 'Cannot mark delivered in its current state.'}, status=400)
+        if not hasattr(order, 'can_mark_delivered') or not order.can_mark_delivered():
+            return Response({'detail': 'Cannot mark delivered in its current state.'}, status=status.HTTP_400_BAD_REQUEST)
         order.mark_delivered(user=request.user)
-        return Response(self.get_serializer(order).data)
+        return Response(self.get_serializer(order).data, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], url_path='bulk-confirm')
+    @action(detail=False, methods=['post'], url_path='bulk-confirm', permission_classes=[RoleScopedPermission, CanApproveOrders])
     def bulk_confirm(self, request):
         ids = request.data.get('ids', [])
         updated = []
-        for order in SalesOrder.objects.filter(id__in=ids):
+        for order in self.get_queryset().filter(id__in=ids):
+            self.check_object_permissions(request, order)
             if order.can_confirm():
                 order.confirm(user=request.user)
                 updated.append(order.id)
-        return Response({'updated': updated})
+        return Response({'updated': updated}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], url_path='bulk-cancel')
+    @action(detail=False, methods=['post'], url_path='bulk-cancel', permission_classes=[RoleScopedPermission, CanApproveOrders])
     def bulk_cancel(self, request):
         ids = request.data.get('ids', [])
         updated = []
-        for order in SalesOrder.objects.filter(id__in=ids):
-            if order.can_cancel():
+        for order in self.get_queryset().filter(id__in=ids):
+            self.check_object_permissions(request, order)
+            if hasattr(order, 'can_cancel') and order.can_cancel():
                 order.cancel(user=request.user)
                 updated.append(order.id)
-        return Response({'updated': updated})
+        return Response({'updated': updated}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['post'], url_path='bulk-status')
+    @action(detail=False, methods=['post'], url_path='bulk-status', permission_classes=[RoleScopedPermission, CanApproveOrders])
     def bulk_status(self, request):
         ids = request.data.get('ids', [])
         status_val = request.data.get('status')
         changed = []
-        for order in SalesOrder.objects.filter(id__in=ids):
+        for order in self.get_queryset().filter(id__in=ids):
             try:
+                self.check_object_permissions(request, order)
                 if status_val == SalesOrder.Status.CONFIRMED and order.can_confirm():
                     order.confirm(user=request.user)
                     changed.append(order.id)
-                elif status_val == SalesOrder.Status.CANCELLED and order.can_cancel():
+                elif status_val == SalesOrder.Status.CANCELLED and hasattr(order, 'can_cancel') and order.can_cancel():
                     order.cancel(user=request.user)
                     changed.append(order.id)
-                elif status_val == SalesOrder.Status.DELIVERED and order.can_mark_delivered():
+                elif status_val == SalesOrder.Status.DELIVERED and hasattr(order, 'can_mark_delivered') and order.can_mark_delivered():
                     order.mark_delivered(user=request.user)
                     changed.append(order.id)
             except Exception:
                 continue
-        return Response({'updated': changed})
+        return Response({'updated': changed}, status=status.HTTP_200_OK)

@@ -1,20 +1,33 @@
 from datetime import date
 from decimal import Decimal
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Q, F
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import permissions
+import logging
 
 from sales.models import SalesOrder, Customer
 from accounting.models import Invoice
-from inventory.models import Product, Inventory, StockLedger
+from inventory.models import Product, Inventory
+
+from authentication.mixins import scope_queryset_for_user
+
+rbac_logger = logging.getLogger("auth.rbac")
 
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def dashboard_metrics(request):
     """Aggregate key metrics with optional date range filtering via ?start=YYYY-MM-DD&end=YYYY-MM-DD."""
+    user = request.user
+    rbac_logger.info(
+        "rbac_api_access endpoint=dashboard_metrics user=%s role=%s params=%s",
+        getattr(user, "username", None),
+        getattr(user, "role", None),
+        dict(request.query_params),
+    )
+
     start_param = request.query_params.get('start')
     end_param = request.query_params.get('end')
     today = timezone.localdate()
@@ -27,22 +40,23 @@ def dashboard_metrics(request):
     except ValueError:
         end = today
 
-    # Sales metrics
-    orders_qs = SalesOrder.objects.filter(order_date__range=(start, end))
+    orders_qs = scope_queryset_for_user(user, SalesOrder.objects.all()).filter(order_date__range=(start, end))
     total_sales = orders_qs.aggregate(total=Sum('total_amount'))['total'] or Decimal('0')
     recent_orders = list(orders_qs.order_by('-order_date')[:5].values('id', 'order_number', 'order_date', 'status', 'total_amount'))
 
-    invoices_qs = Invoice.objects.filter(invoice_date__range=(start, end))
+    invoices_qs = scope_queryset_for_user(user, Invoice.objects.all()).filter(invoice_date__range=(start, end))
     pending_invoices = invoices_qs.exclude(status__in=['PAID', 'CANCELLED']).count()
 
-    # Inventory metrics
-    total_products = Product.objects.count()
-    low_stock = Inventory.objects.filter(on_hand__lte=F('reorder_level')).count()
-    inv_value = Inventory.objects.select_related('product').aggregate(val=Sum(F('on_hand') * F('product__cost_price')))['val'] or Decimal('0')
+    products_qs = scope_queryset_for_user(user, Product.objects.all())
+    total_products = products_qs.count()
+    inventory_qs = scope_queryset_for_user(user, Inventory.objects.select_related('product').all())
+    low_stock = inventory_qs.filter(on_hand__lte=F('reorder_level')).count()
+    inv_value = inventory_qs.aggregate(val=Sum(F('on_hand') * F('product__cost_price')))['val'] or Decimal('0')
 
     # Customer metrics
-    total_customers = Customer.objects.count()
-    new_customers = Customer.objects.filter(created_at__gte=start).count()
+    customers_qs = scope_queryset_for_user(user, Customer.objects.all())
+    total_customers = customers_qs.count()
+    new_customers = customers_qs.filter(created_at__gte=start).count()
 
     # Financial metrics
     outstanding = invoices_qs.aggregate(balance=Sum('balance_amount'))['balance'] or Decimal('0')
@@ -81,11 +95,27 @@ def global_search(request):
     if not term:
         return Response({'results': []})
 
+    user = request.user
+    rbac_logger.info(
+        "rbac_api_access endpoint=global_search user=%s role=%s params=%s",
+        getattr(user, "username", None),
+        getattr(user, "role", None),
+        dict(request.query_params),
+    )
+
     # Basic case-insensitive icontains search; could expand to trigrams/fuzzy
-    customer_hits = Customer.objects.filter(Q(name__icontains=term) | Q(customer_code__icontains=term))[:limit]
-    product_hits = Product.objects.filter(Q(name__icontains=term) | Q(sku__icontains=term))[:limit]
-    order_hits = SalesOrder.objects.filter(Q(order_number__icontains=term))[:limit]
-    invoice_hits = Invoice.objects.filter(Q(invoice_number__icontains=term))[:limit]
+    customer_hits = scope_queryset_for_user(user, Customer.objects.all()).filter(
+        Q(name__icontains=term) | Q(customer_code__icontains=term)
+    )[:limit]
+    product_hits = scope_queryset_for_user(user, Product.objects.all()).filter(
+        Q(name__icontains=term) | Q(sku__icontains=term)
+    )[:limit]
+    order_hits = scope_queryset_for_user(user, SalesOrder.objects.all()).filter(
+        Q(order_number__icontains=term)
+    )[:limit]
+    invoice_hits = scope_queryset_for_user(user, Invoice.objects.all()).filter(
+        Q(invoice_number__icontains=term)
+    )[:limit]
 
     def serialize(qs, type_name, fields):
         return [
